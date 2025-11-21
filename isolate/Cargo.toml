@@ -1,0 +1,33 @@
+[package]
+name = "isolate"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "isolate"
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl = "0.31.1"
+spl-associated-token-account = "6.0.0"
+spl-memo = "6.0.0"
+spl-discriminator = "0.5.0"
+spl-program-error = "0.5.0"
+raydium-cp-swap = { path = "../raydium-cp-swap/programs/cp-swap", features = ["cpi"] }
+
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+# FROM ZKHACK-BLS-PEDERSEN: Pure Rust BLS12-381 (BPF-safe, arkworks)
+# Replace your ark deps with this block
+ark-std = { version = "0.4.0" }            # allow std feature
+ark-bls12-381 = { version = "0.4.0" }      # expose Bls12_381, G1/G2, Fr at crate root
+ark-ec = { version = "0.4.0" }             # core ec traits
+ark-ff = { version = "0.4.0" }             # field types
+ark-serialize = { version = "0.4.0", features = ["derive"] }
+sha2 = "0.10"
+
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
+[features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]

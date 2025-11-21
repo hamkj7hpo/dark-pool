@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "isolate",
+    "raydium-cp-swap/programs/cp-swap"
+]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+strip = true
