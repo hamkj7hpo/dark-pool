@@ -1,15 +1,11 @@
-// isolate/src/lib.rs
-
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{TokenInterface, TokenAccount as InterfaceTokenAccount};
-
 use raydium_cp_swap::cpi::accounts::Swap;
 use raydium_cp_swap::cpi::swap_base_input;
-
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
 use ark_ec::pairing::Pairing;
 use ark_ec::AffineRepr;
-use ark_serialize::{CanonicalDeserialize, Compress};
+use ark_serialize::{CanonicalDeserialize};
 use sha2::{Digest, Sha256};
 
 declare_id!("7VJ8PT2BA5UacYLyF1AmYMCjZjJijqMthgHzQogFhfSt");
@@ -20,11 +16,12 @@ pub mod isolate {
 
     #[event]
     pub struct DarkSwap {
-        pub authority: Pubkey,
+        pub masked_user: String,
         pub amount_in: u64,
         pub is_buy: bool,
         pub classification: String,
-        pub timestamp: i64,
+        pub protocol: String,
+        pub version: String,
     }
 
     pub fn swap(
@@ -62,16 +59,8 @@ pub mod isolate {
             payer: ctx.accounts.user.to_account_info(),
             amm_config: ctx.accounts.amm_config.to_account_info(),
             pool_state: ctx.accounts.pool_state.to_account_info(),
-            input_token_account: if is_buy {
-                ctx.accounts.user_sol.to_account_info()
-            } else {
-                ctx.accounts.user_token.to_account_info()
-            },
-            output_token_account: if is_buy {
-                ctx.accounts.user_token.to_account_info()
-            } else {
-                ctx.accounts.user_sol.to_account_info()
-            },
+            input_token_account: if is_buy { ctx.accounts.user_sol.to_account_info() } else { ctx.accounts.user_token.to_account_info() },
+            output_token_account: if is_buy { ctx.accounts.user_token.to_account_info() } else { ctx.accounts.user_sol.to_account_info() },
             input_token_mint: ctx.accounts.input_mint.to_account_info(),
             output_token_mint: ctx.accounts.output_mint.to_account_info(),
             input_vault: ctx.accounts.input_vault.to_account_info(),
@@ -85,23 +74,34 @@ pub mod isolate {
         swap_base_input(cpi_ctx, if is_buy { net_amount } else { amount_in }, minimum_amount_out)?;
 
         let classification = if amount_in >= 1_000_000_000_000 {
-            "Leviathan".to_string()
+            "Leviathan"
         } else if amount_in >= 100_000_000_000 {
-            "Kraken".to_string()
+            "Kraken"
         } else if amount_in >= 10_000_000_000 {
-            "Whale".to_string()
+            "Whale"
         } else if amount_in >= 1_000_000_000 {
-            "Shark".to_string()
+            "Shark"
         } else {
-            "Crab".to_string()
+            "Crab"
         };
 
+        let masked_user = format!("ANON-{}", classification.to_uppercase());
+
+        msg!(
+            "CRAB DARKSWAP {} {} {} {}",
+            if is_buy { "BUY" } else { "SELL" },
+            amount_in,
+            classification,
+            masked_user
+        );
+
         emit!(DarkSwap {
-            authority: ctx.accounts.swap_authority.key(),
+            masked_user,
             amount_in,
             is_buy,
-            classification,
-            timestamp: clock.unix_timestamp,
+            classification: classification.to_string(),
+            protocol: "CRAB".to_string(),
+            version: "V5".to_string(),
         });
 
         let gs = &mut ctx.accounts.global_state;
@@ -138,10 +138,10 @@ pub struct SwapContext<'info> {
     #[account(mut)]
     pub user_state: Account<'info, UserState>,
 
-    /// CHECK: Validated by Raydium
+    /// CHECK: Raydium validated
     pub amm_config: UncheckedAccount<'info>,
 
-    /// CHECK: Validated by Raydium
+    /// CHECK: Raydium validated
     #[account(mut)]
     pub pool_state: UncheckedAccount<'info>,
 
@@ -151,13 +151,13 @@ pub struct SwapContext<'info> {
     #[account(mut)]
     pub output_vault: InterfaceAccount<'info, InterfaceTokenAccount>,
 
-    /// CHECK: Mint validated by vault
+    /// CHECK: Validated by vault
     pub input_mint: UncheckedAccount<'info>,
 
-    /// CHECK: Mint validated by vault
+    /// CHECK: Validated by vault
     pub output_mint: UncheckedAccount<'info>,
 
-    /// CHECK: Observation validated by Raydium
+    /// CHECK: Raydium validated
     #[account(mut)]
     pub observation_state: UncheckedAccount<'info>,
 
@@ -174,7 +174,7 @@ pub struct SwapContext<'info> {
 pub enum ErrorCode {
     #[msg("Invalid BLS signature")] InvalidBlsSignature,
     #[msg("Invalid nonce")] InvalidNonce,
-    #[msg("Anti-sniper cooldown")] AntiSniperCooldown,
+    #[msg("Anti-sniper cooldown not passed")] AntiSniperCooldown,
     #[msg("Math overflow")] MathError,
 }
 
@@ -184,7 +184,7 @@ pub fn verify_bls_sig(sig_bytes: [u8; 96], pk_bytes: [u8; 48], msg: &[u8]) -> bo
 
     let mut hasher = Sha256::new();
     hasher.update(msg);
-    hasher.update(b"SAFE-PUMP-V5");
+    hasher.update(b"CRAB-V5");
     let base = hasher.finalize();
 
     let hash_point = {
@@ -194,9 +194,7 @@ pub fn verify_bls_sig(sig_bytes: [u8; 96], pk_bytes: [u8; 48], msg: &[u8]) -> bo
             h.update(&base);
             h.update(&[i]);
             let digest = h.finalize();
-            if let Ok(p) = G2Affine::deserialize_compressed(&digest[..]) {
-                break p;
-            }
+            if let Ok(p) = G2Affine::deserialize_compressed(&digest[..]) { break p; }
             i = i.wrapping_add(1);
             if i == 0 { return false; }
         }
