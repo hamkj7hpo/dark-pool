@@ -9,7 +9,7 @@ use raydium_cp_swap::cpi::swap_base_input;
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
 use ark_ec::pairing::Pairing;
 use ark_ec::AffineRepr;
-use ark_serialize::CanonicalDeserialize;
+use ark_serialize::{CanonicalDeserialize, Compress};
 use sha2::{Digest, Sha256};
 
 declare_id!("7VJ8PT2BA5UacYLyF1AmYMCjZjJijqMthgHzQogFhfSt");
